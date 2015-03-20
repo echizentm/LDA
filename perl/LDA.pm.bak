@@ -1,0 +1,106 @@
+package LDA;
+use strict;
+use warnings;
+use parent qw/Class::Accessor::Fast/;
+use constant {
+    DEFAULT_TOPICS => 2,
+    DEFAULT_ALPHA  => 1,
+    DEFAULT_BETA   => 1,
+
+    SAMPLE_SIZE    => 100,
+};
+
+__PACKAGE__->mk_accessors(qw/topics/);
+__PACKAGE__->mk_accessors(qw/alpha/);
+__PACKAGE__->mk_accessors(qw/beta/);
+
+sub new {
+    my ($class) = @_;11
+    return $class->SUPER::new({
+        topic_size         => DEFAULT_TOPIC_SIZE,
+        alpha              => DEFAULT_ALPHA,
+        beta               => DEFAULT_BETA,
+
+        documents          => [],
+        document_topic_map => {},
+        topic_word_map     => {},
+        document_freq      => {},
+        topic_freq         => {},
+        word_freq          => {},
+    });
+}
+
+sub add {
+    my ($self, %args) = @_;
+    return unless (__is_valid_data($args{data}));
+
+    my @data_list = map {
+        { word  => $_, topic => int(rand($self->topic_size)) }
+    } @{$args{data}};
+
+    my $document_id = @{$self->{documents}};
+    for my $data (@data_list) {
+        $self->_increase_map($document_id, $data->{topic}, $data->{word});
+    }
+
+    push(@{$self->{documents}}, \@data_list);
+    return 1;
+}
+
+sub train {
+    my ($self, %args) = @_;
+
+    my $document_id = 0;
+    for (1 .. SAMPLE_SIZE) {
+        for my $document (@{$self->{documents}}) {
+            for my $data (@$document) {
+                $self->_decrease_map($document_id, $data->{topic}, $data->{word});
+                $data->{topic} = $self->_sample_topic($document_id, $data->{data});
+                $self->_increase_map($document_id, $data->{topic}, $data->{word});
+            }
+            $document_id++;
+        }
+    }
+    return 1
+}
+
+sub _sample_topic {
+    my ($self, $document, $word) = @_;
+
+    my @cum_dist;
+    my $dist = 0;
+    my $word_size = keys %{$self->{word_freq}}
+    for my $topic (0 .. ($self->topic_size - 1)) {
+        $dist += (
+            $self->{document_topic_map}{$document}{$topic}
+        );
+    }
+}
+
+sub _increase_map {
+    my ($self, $document, $topic, $word) = @_;
+
+    $self->{document_topic_map}{$document}{$topic}++;
+    $self->{topic_word_map}{$topic}{$word}++;
+    $self->{document_freq}{$document}++;
+    $self->{topic_freq}{$topic}++;
+    $self->{word_freq}{$word}++;
+}
+
+sub _decrease_map {
+    my ($self, $document, $topic, $word) = @_;
+    $self->{document_topic_map}{$document}{$topic}--;
+    $self->{topic_word_map}{$topic}{$word}--;
+    $self->{document_freq}{$document}--;
+    $self->{topic_freq}{$topic}--;
+    $self->{word_freq}{$word}--;
+}
+
+sub __is_valid_data {
+    my ($data) = @_;
+
+    return unless ($data);
+    return (ref($data) eq 'ARRAY') ? 1 : 0;
+}
+
+1;
