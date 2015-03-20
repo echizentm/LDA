@@ -8,7 +8,6 @@ use constant {
     DEFAULT_TOPIC_SIZE  => 2,
     DEFAULT_ALPHA       => 1,
     DEFAULT_BETA        => 1,
-
 };
 
 __PACKAGE__->mk_accessors(qw/sample_size/);
