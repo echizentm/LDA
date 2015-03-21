@@ -66,21 +66,39 @@ sub train {
     return 1
 }
 
+sub words_on_topic {
+    my ($self, %args) = @_;
+
+    return unless (defined $args{topic});
+    my @words = sort {
+        $b->{prob} <=> $a->{prob}
+    } map {
+        { word => $_, prob => $self->_expect_phi($args{topic}, $_) }
+    } keys %{$self->{word_map}};
+    return \@words;
+}
+
+sub topics_on_document {
+    my ($self, %args) = @_;
+
+    return unless (defined $args{document});
+    my @topics = sort {
+        $b->{prob} <=> $a->{prob}
+    } map {
+        { topic => $_, prob => $self->_expect_theta($args{document}, $_) }
+    } keys %{$self->{topic_map}};
+    return \@topics;
+}
+
 sub _sample_topic {
     my ($self, $document, $word) = @_;
 
     my @cum_dists;
-    my $cum_dist = 0;
-    my $word_size = keys %{$self->{word_map}};
+    my $cum_dist = 0.0;
     for my $topic (0 .. ($self->topic_size - 1)) {
-        $self->{document_topic_map}{$document}{$topic} //= 0;
-        $self->{topic_word_map}{$topic}{$word}         //= 0;
-
         $cum_dist += (
-              ($self->{document_topic_map}{$document}{$topic} + $self->alpha)
-            / ($self->{document_map}{$document} + $self->topic_size * $self->alpha)
-            * ($self->{topic_word_map}{$topic}{$word} + $self->beta)
-            / ($self->{topic_map}{$topic} + $word_size * $self->beta)
+            $self->_expect_phi($topic, $word) *
+            $self->_expect_theta($document, $topic)
         );
         push(@cum_dists, $cum_dist);
     }
@@ -90,6 +108,25 @@ sub _sample_topic {
         return $topic if ($sampled_dist < $cum_dists[$topic]);
     }
     return ($self->topic_size - 1);
+}
+
+sub _expect_phi {
+    my ($self, $topic, $word) = @_;
+
+    $self->{topic_word_map}{$topic}{$word} //= 0.0;
+    $self->{topic_map}{$topic}             //= 0.0;
+    my $word_size = keys %{$self->{word_map}};
+    return ($self->{topic_word_map}{$topic}{$word} + $self->beta) /
+           ($self->{topic_map}{$topic} + $word_size * $self->beta);
+}
+
+sub _expect_theta {
+    my ($self, $document, $topic) = @_;
+
+    $self->{document_topic_map}{$document}{$topic} //= 0.0;
+    $self->{document_map}{$document}               //= 0.0;
+    return ($self->{document_topic_map}{$document}{$topic} + $self->alpha) /
+           ($self->{document_map}{$document} + $self->topic_size * $self->alpha);
 }
 
 sub _increase_map {
@@ -104,6 +141,7 @@ sub _increase_map {
 
 sub _decrease_map {
     my ($self, $document, $topic, $word) = @_;
+
     $self->{document_topic_map}{$document}{$topic}--;
     $self->{topic_word_map}{$topic}{$word}--;
     $self->{document_map}{$document}--;
