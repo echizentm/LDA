@@ -24,12 +24,6 @@ $lda->train();
 
 for my $topic (0 .. ($topic_size - 1)) {
     my $words_on_topic = $lda->words_on_topic(topic => $topic);
-    my $ct = 0;
-    print "topic[$topic]\n";
-    for my $word (@$words_on_topic) {
-        print "$word->{word}\t$word->{prob}\n";
-        $ct++;
-        last if ($ct >= MAX_WORDS);
-    }
-    print "\n";
+    splice(@$words_on_topic, MAX_WORDS);
+    print join("\n", "topic[$topic]", map { "$_->{word}\t$_->{prob}"; } @$words_on_topic)."\n\n";
 }
